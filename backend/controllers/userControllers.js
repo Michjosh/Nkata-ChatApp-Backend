@@ -59,6 +59,38 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 });
 
+
+//@description     Update user profile
+//@route           PUT /api/user/profile
+//@access          Private
+const updateUserProfile = asyncHandler(async (req, res) => {
+  const { name, email, password, pic } = req.body;
+  
+  let user = await User.findById(req.user._id);
+
+  if (user) {
+    user.name = name || user.name;
+    user.email = email || user.email;
+    user.password = password || user.password;
+    user.pic = pic || user.pic;
+
+    const updatedUser = await user.save();
+
+    res.json({
+      _id: updatedUser._id,
+      name: updatedUser.name,
+      email: updatedUser.email,
+      isAdmin: updatedUser.isAdmin,
+      pic: updatedUser.pic,
+      token: generateToken(updatedUser._id),
+    });
+  } else {
+    res.status(404);
+    throw new Error("User not found");
+  }
+});
+
+
 //@description     Auth the user
 //@route           POST /api/users/login
 //@access          Public
@@ -82,4 +114,4 @@ const authUser = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { allUsers, registerUser, authUser };
+module.exports = { allUsers, registerUser, authUser, updateUserProfile };
