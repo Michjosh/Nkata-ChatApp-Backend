@@ -1,6 +1,7 @@
 const asyncHandler = require("express-async-handler");
 const User = require("../../models/userModel");
 const generateToken = require("../config/generateToken");
+const bcrypt = require("bcryptjs");
 
 //@description     Get or Search all users
 //@route           GET /api/user?search=
@@ -59,30 +60,42 @@ const registerUser = asyncHandler(async (req, res) => {
   }
 });
 
-
-//@description     Update user profile
-//@route           PUT /api/user/profile
-//@access          Private
+// @description     Update user profile
+// @route           PATCH /api/user/profile
+// @access          Private
 const updateUserProfile = asyncHandler(async (req, res) => {
   const { name, email, password, pic } = req.body;
-  
-  let user = await User.findById(req.user._id);
+
+  // Create an object to hold the fields that are not null
+  const updateFields = {};
+
+  // Check each field and add it to the updateFields object if it is not null
+  if (name) {
+    updateFields.name = name;
+  }
+  if (email) {
+    updateFields.email = email;
+  }
+  if (password) {
+    updateFields.password = password;
+  }
+  if (pic) {
+    updateFields.pic = pic;
+  }
+
+  // Update the user profile with the non-null fields
+  let user = await User.findByIdAndUpdate(req.user._id, updateFields, {
+    new: true,
+  });
 
   if (user) {
-    user.name = name || user.name;
-    user.email = email || user.email;
-    user.password = password || user.password;
-    user.pic = pic || user.pic;
-
-    const updatedUser = await user.save();
-
     res.json({
-      _id: updatedUser._id,
-      name: updatedUser.name,
-      email: updatedUser.email,
-      isAdmin: updatedUser.isAdmin,
-      pic: updatedUser.pic,
-      token: generateToken(updatedUser._id),
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      isAdmin: user.isAdmin,
+      pic: user.pic,
+      token: generateToken(user._id),
     });
   } else {
     res.status(404);
@@ -90,11 +103,10 @@ const updateUserProfile = asyncHandler(async (req, res) => {
   }
 });
 
-
 //@description     Auth the user
 //@route           POST /api/users/login
 //@access          Public
-const authUser = asyncHandler(async (req, res) => {
+const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
 
   const user = await User.findOne({ email });
@@ -114,4 +126,45 @@ const authUser = asyncHandler(async (req, res) => {
   }
 });
 
-module.exports = { allUsers, registerUser, authUser, updateUserProfile };
+// @description     Update user password
+// @route           PATCH /api/user/reset-password
+// @access          Public
+const resetPassword = asyncHandler(async (req, res) => {
+  //find user
+  const { email } = req.body;
+  const foundUser = await User.findOne({ email });
+  if (!foundUser) {
+    return res.status(401).json({
+      message: `There is no user with ${req.body.email} email address.`,
+    });
+  }
+
+  //encrypt new password
+  const salt = await bcrypt.genSalt(10);
+  const newPassword = await bcrypt.hash(req.body.password, salt);
+
+  //update and save new password
+  let user = await User.findByIdAndUpdate(
+    foundUser._id,
+    { password: newPassword },
+    { new: true }
+  );
+
+  //send response message
+  if (user) {
+    res.status(201).json({
+      message: "Password changed Successsfully",
+      token: generateToken(user._id),
+    });
+  } else {
+    throw new Error("Password reset failed");
+  }
+});
+
+module.exports = {
+  allUsers,
+  registerUser,
+  login,
+  updateUserProfile,
+  resetPassword,
+};
