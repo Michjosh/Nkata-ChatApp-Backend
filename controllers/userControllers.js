@@ -128,11 +128,8 @@ const verify = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate({ _id: userId }, { verified: true });
     await UserVerification.deleteOne({ userId });
 
-    const chatLink = "http://localhost:3000/chats";
-    res.json({
-      Status: "Success",
-      message: `Verification done successfully, click <a href="${chatLink}"> here</a> to go to your dashboard`,
-    });
+    const home = "http://localhost:3000";
+    res.redirect(home); // Redirect the user to the home URL
   } catch (error) {
     console.log("An error occurred:", error);
     res.status(500).json({
@@ -140,6 +137,7 @@ const verify = asyncHandler(async (req, res) => {
     });
   }
 });
+
 
 // @description     Update user profile
 // @route           PATCH /api/user/profile
@@ -192,6 +190,11 @@ const login = asyncHandler(async (req, res) => {
 
   const user = await User.findOne({ email });
 
+  if(user.verified === false){
+    res.status(401);
+    throw new Error("Kindly check your email to verify your account");
+  }
+
   if (user && (await user.matchPassword(password))) {
     res.json({
       _id: user._id,
@@ -206,6 +209,7 @@ const login = asyncHandler(async (req, res) => {
     throw new Error("Invalid Email or Password");
   }
 });
+
 
 // @description     Update user password
 // @route           PATCH /api/user/reset-password
