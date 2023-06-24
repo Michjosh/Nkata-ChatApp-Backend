@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   registerUser,
+  verify,
   login,
   allUsers,
   updateUserProfile,
@@ -12,6 +13,7 @@ const router = express.Router();
 
 router.route("/").get(protect, allUsers);
 router.route("/").post(registerUser);
+router.route("/verify").get(verify);
 router.route("/profile").patch(protect, updateUserProfile); 
 router.route("/reset-password").patch(protect, resetPassword)
 router.post("/login", login);

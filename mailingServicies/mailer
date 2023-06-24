@@ -1,0 +1,79 @@
+const nodemailer = require("nodemailer");
+require("dotenv").config();
+const generateToken = require("../config/generateToken");
+const bcrypt = require("bcryptjs");
+const UserVerification = require("../models/userVerification");
+const template = require("../views/verify.html")
+
+
+const transporter = nodemailer.createTransport({
+  host: "smtp.gmail.com",
+  port: 465,
+  secure: true, // Use SSL/TLS
+  auth: {
+    user: process.env.EMAIL,
+    pass: process.env.PASSWORD,
+  },
+});
+
+// async function main() {
+//   // send mail with defined transport object
+//   const info = await transporter.sendMail({
+//     from: 'softwaredevelopment218@gmail.com', // sender address
+//     to: 'michaelikejoshua@gmail.com', // list of receivers
+//     subject: "Hello ✔", // Subject line
+//     text: "Hello world?", // plain text body
+//     html: "<b>Hello world?</b>", // html body
+//   });
+//   console.log("Message sent: %s", info.messageId);
+// }
+// main().catch(console.error);
+
+transporter.verify((error, success) => {
+  if (error) {
+    console.log(error);
+  } else {
+    console.log("Ready for messages");
+    console.log(success);
+  }
+});
+
+const sendVerificationEmail = async ({ _id, name, email }) => {
+    try {
+      const url = "http://localhost:5000";
+      const token = generateToken(_id);
+      const salt = 10;
+      const hashedUnigStr = bcrypt.hashSync(token, salt);
+      const link = `<a href="${url}/api/user/verify?uniqueString=${token}&userId=${_id}">here</a>`
+  
+      const mailOptions = {
+        from: process.env.EMAIL,
+        to: email,
+        subject: "Verify Your Email",
+        html: template(name, link )
+        // html: `<p>Verify your email address to complete your signup and login in to your account</p> 
+        // <p>This link <b>expires in 6hrs</b></p> <p>Press <a href="${url}/api/user/verify?uniqueString=${token}&userId=${_id}">here</a> to proceed.</p>`,
+      };
+  
+      const newVeri = new UserVerification({
+        userId: _id,
+        name: name,
+        uniqueString: hashedUnigStr,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 21600000,
+      });
+  
+      await newVeri.save();
+  
+      await transporter.sendMail(mailOptions);
+  
+      const verificationLink = `${url}/api/user/verify?uniqueString=${token}&userId=${_id}`;
+  
+      return verificationLink;
+    } catch (error) {
+      console.log(error);
+      throw new Error("An error occurred while sending the verification email");
+    }
+  };
+
+  module.exports = sendVerificationEmail;
