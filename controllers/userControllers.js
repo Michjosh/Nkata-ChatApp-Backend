@@ -5,7 +5,8 @@ const generateToken = require("../config/generateToken");
 const bcrypt = require("bcryptjs");
 require("dotenv").config();
 const validator = require("validator");
-const sendVerificationEmail = require("../mailingServicies/mailer");
+const sendVerificationEmail = require("../mailingServicies/Registerationmailer");
+const sendForgotPassEmail = require("../mailingServicies/ForgotPasswordMailer")
 
 //@description     Get or Search all users
 //@route           GET /api/user?search=
@@ -212,10 +213,10 @@ const login = asyncHandler(async (req, res) => {
 
 
 // @description     Update user password
-// @route           PATCH /api/user/reset-password
+// @route           POST /api/user/forgot-password
 // @access          Public
-const resetPassword = asyncHandler(async (req, res) => {
-  //find user
+const forgotPassword = asyncHandler(async (req, res) => {
+  // Find user
   const { email } = req.body;
   const foundUser = await User.findOne({ email });
   if (!foundUser) {
@@ -223,6 +224,54 @@ const resetPassword = asyncHandler(async (req, res) => {
       message: `There is no user with ${req.body.email} email address.`,
     });
   }
+
+
+  const verificationLink = await sendForgotPassEmail({
+    _id: foundUser._id,
+    name: foundUser.name,
+    email: email,
+  });
+
+  if (foundUser) {
+    // Send success response with verification email message and link
+    res.status(201).json({
+      message: `Password reset instructions sent to your email address, check your email ${foundUser.email} to proceed with the process`,
+      verificationLink: verificationLink,
+    });
+  } else {
+    res.status(400);
+    throw new Error("An error occurred");
+  }
+});
+
+
+// @description     Update user password
+// @route           PATCH /api/user/reset-password
+// @access          Public
+const resetPassword = asyncHandler(async (req, res) => {
+  //find user
+  const { userId } = req.query;
+  const foundUser = await User.findById(userId);
+  if (!foundUser) {
+    return res.status(401).json({
+      message: `User not found`,
+    });
+  }
+
+    // Validate password strength
+    if (
+      !validator.isStrongPassword(req.body.password, {
+        minLength: 6,
+        minUppercase: 1,
+        minNumbers: 1,
+        minSymbols: 1,
+      })
+    ) {
+      res.status(400);
+      throw new Error(
+        "Password must be at least 6 characters long and contain at least one uppercase letter, one number, and one special character"
+      );
+    }
 
   //encrypt new password
   const salt = await bcrypt.genSalt(10);
@@ -252,5 +301,6 @@ module.exports = {
   verify,
   login,
   updateUserProfile,
+  forgotPassword,
   resetPassword,
 };
